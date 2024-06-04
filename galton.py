@@ -21,7 +21,7 @@ class GaltonBoard(Scene):
         
         def updateFrameFunction(table):
             #updateCounter()
-            #updateStackValue(1)
+            updateStackValue(1)
             durationSeconds = GaltonBoard.config["durationSeconds"]
             durationFrames = durationSeconds * self.camera.frame_rate
 
