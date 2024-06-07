@@ -4,7 +4,7 @@ import random
 class GaltonBoard(Scene):
 
     config = {
-        "runTime": 5,
+        "runTime": 12,
         "itemsTotal" : 150,
         "itemDelayFrames" : 2,
         "hexSize" : .2,
@@ -14,16 +14,40 @@ class GaltonBoard(Scene):
         "firstHexCenterX" : -3,
         "firstHexCenterY" : 3,
         "durationSeconds" : 2,
-        "circleRadius" : .05
+        "circleRadius" : .05,
+        "firstDot" : [-3, 4.3, 0]
         }
+    
+    frameNumber = 0
 
     def construct(self):
         
+        # uncomment to show dots on the plain every 1 point in both directions.
+        # also pass (True) to show axes and (False) without axes
+        #self.showDotMap(False)
+
+        table = self.createTable()
+        counter = self.createCounter()
+        hexagons = self.createHexagons()
+        vertices = self.createVertices()
+        items = self.createItems(vertices)
+
         def updateFrameFunction(table):
-            #updateCounter()
-            updateStackValue(1)
             durationSeconds = GaltonBoard.config["durationSeconds"]
             durationFrames = durationSeconds * self.camera.frame_rate
+            self.frameNumber += 1
+
+            for item in items:
+                if item.isActive and self.frameNumber > item.startFrame:
+                    alpha = (self.frameNumber - item.startFrame) / durationFrames
+                    if (alpha <= 1.0) :
+                        point = item.path.point_from_proportion(rate_functions.linear(alpha))
+                        item.circle.move_to(point)     
+                    else:
+                        updateCounter()
+                        updateStackValue(item.stackIndex)
+                        item.isActive = False
+
 
         def updateCounter():
             val = counter[0].get_value()
@@ -36,17 +60,18 @@ class GaltonBoard(Scene):
             val += 1
             cell.set_value(val)
 
-        table = self.createTable()
-        counter = self.createCounter()
-        hexagons = self.createHexagons()
-        items = self.createItems()
-
-        #print(self.camera.frame_rate)
         self.play(FadeIn(hexagons, run_time = 1))
         self.play(FadeIn(table, run_time = 1))
         self.play(FadeIn(counter, run_time = 1))
 
-        self.play(UpdateFromFunc(table, updateFrameFunction), run_time=3)
+        # we need to provide to UpdateFromFunc object that should by updated by every frame
+        # without it where will (can) be some weird things with animation
+        wrapper = VGroup(table, counter)
+        for item in items:
+            wrapper.add(item.circle)
+
+        runTime = GaltonBoard.config["runTime"]
+        self.play(UpdateFromFunc(wrapper, updateFrameFunction), run_time=runTime)
 
         self.wait(3)
 
@@ -90,14 +115,121 @@ class GaltonBoard(Scene):
 
         return hexagons
     
-    def createItems(self):
-        items = []
-        #itemsTotal = GaltonBoard.config["itemsTotal"]
-        #circleRadius = GaltonBoard.config["circleRadius"]
-        #item = Item()
-        #circle = Circle(radius=.05, color=GREEN, fill_opacity=1)
+    def createVertices(self):
+        rows = GaltonBoard.config["hexRowsCount"]
+        hexSize = GaltonBoard.config["hexSize"]
+        hexVerticalShift = GaltonBoard.config["hexVerticalShift"]
+        hexGorizontalShift = GaltonBoard.config["hexGorizontalShift"]
+        firstHexCenterX = GaltonBoard.config["firstHexCenterX"]
+        firstHexCenterY = GaltonBoard.config["firstHexCenterY"]
 
-        return items   
+        vertices = [[None for i in range(rows + 1)] for j in range(rows + 1)]
+
+        for row in range(rows + 1):
+            currentRowShiftUp = (firstHexCenterY - row * hexVerticalShift)
+            currentRowShiftRight = (firstHexCenterX - row * hexGorizontalShift)
+            for elem in range(row + 1):
+                elemShiftRight = currentRowShiftRight + (elem * hexGorizontalShift) * 2
+                vertices[row][elem] = [elemShiftRight, currentRowShiftUp + hexSize + .1, 0]
+
+        # uncomment to show all the vertices
+        #for row in range(rows + 1):
+        #    for col in range(rows + 1):
+        #        tmp = vertices[row][col]
+        #        if tmp is not None:
+        #            t = Dot(tmp, radius=.05)
+        #            self.add(t)
+
+        return vertices
+    
+    def createItems(self, vertices):
+
+        itemsTotal = GaltonBoard.config["itemsTotal"]
+        circleRadius = GaltonBoard.config["circleRadius"]
+        itemDelayFrames = GaltonBoard.config["itemDelayFrames"]
+        firstDot = GaltonBoard.config["firstDot"]
+
+        items = []
+        startFrame = 0
+        stackValues = [0, 0, 0, 0, 0, 0, 0, 0]
+
+        for k in range (itemsTotal):
+            item = Item()
+            circle = Circle(radius=circleRadius, color=GREEN, fill_opacity=1)
+            pathIndex = random.randrange(128)
+            stackIndex = pathIndex.bit_count()
+            stackValues[stackIndex] += 1
+
+            path = self.createPath(vertices, pathIndex, stackValues[stackIndex])
+
+            item.path = path
+            item.circle = circle
+            item.stackIndex = stackIndex
+            item.startFrame = startFrame
+            
+            startFrame += itemDelayFrames
+
+            self.add(circle)
+            circle.move_to(firstDot)
+
+            items.append(item)
+
+            # uncomment to show the path
+            #self.add(path)
+
+        return items  
+
+    def createPath(self, vertices, pathIndex, itemsCountInStack):
+
+        firstDot = GaltonBoard.config["firstDot"]
+        rowCapacity = 3
+
+        lastDotRowIndex = (itemsCountInStack - 1) // rowCapacity
+        lastDotColIndex = (itemsCountInStack - 1) % rowCapacity 
+        
+        path = Line(firstDot, vertices[0][0], stroke_width=1)
+        previousDot = vertices[0][0]
+        binary = bin(pathIndex)[2:].zfill(7)
+        rowIndex = 1
+        colIndex = 0
+        for digit in binary:
+            if digit == '0':
+                pathTmp = ArcBetweenPoints(previousDot, vertices[rowIndex][colIndex], angle=PI/2, stroke_width=1)
+                previousDot = vertices[rowIndex][colIndex]
+            else:
+                colIndex += 1
+                pathTmp = ArcBetweenPoints(previousDot, vertices[rowIndex][colIndex], angle=-PI/2, stroke_width=1)
+                previousDot = vertices[rowIndex][colIndex]
+            path.append_vectorized_mobject(pathTmp)
+            rowIndex += 1
+
+        lastDotWidth = .1
+        lastDotHeight = .1
+
+        lastDotX = previousDot[0]
+        
+        if lastDotColIndex == 0:
+            lastDotX = lastDotX - lastDotWidth
+        elif lastDotColIndex == 2:
+            lastDotX = lastDotX + lastDotWidth
+
+        lastDotY = previousDot[1] - 2.4 + lastDotHeight * lastDotRowIndex
+
+        pathLast = Line(previousDot, [lastDotX, lastDotY, 0] , stroke_width=1)
+        path.append_vectorized_mobject(pathLast)
+
+        return path           
+
+
+    def showDotMap(self, showAxes):
+        for x in range(-7, 8):
+            for y in range(-4, 5):
+                dot = Dot(np.array([x, y, 0]), radius=0.02)
+                self.add(dot) 
+
+        if (showAxes):
+            ax = Axes(x_range=[-7, 7], y_range=[-4, 4], x_length=14, y_length=8)
+            self.add(ax)
 
 class Item:
     circle = None
@@ -105,3 +237,4 @@ class Item:
     startFrame = 0
     stackIndex = 0
     isActive = True
+    
