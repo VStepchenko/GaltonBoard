@@ -4,9 +4,9 @@ import random
 class GaltonBoard(Scene):
 
     config = {
-        "runTime": 12,
-        "itemsTotal" : 150,
-        "itemDelayFrames" : 2,
+        "runTime": 16,#9
+        "itemsTotal" : 200,
+        "itemDelayFrames" : 1,
         "hexSize" : .2,
         "hexVerticalShift" : .6,
         "hexGorizontalShift" : .4,
@@ -64,8 +64,8 @@ class GaltonBoard(Scene):
         self.play(FadeIn(table, run_time = 1))
         self.play(FadeIn(counter, run_time = 1))
 
-        # we need to provide to UpdateFromFunc object that should by updated by every frame
-        # without it where will (can) be some weird things with animation
+        # we need pass to the UpdateFromFunc the special object that should be updated every frame
+        # without it where will (under some unpredictable conditions) be problems with animation
         wrapper = VGroup(table, counter)
         for item in items:
             wrapper.add(item.circle)
@@ -108,7 +108,10 @@ class GaltonBoard(Scene):
             currentRowShiftRight = (firstHexCenterX - row * hexGorizontalShift)
             for elem in range(row + 1):
                 elemShiftRight = currentRowShiftRight + (elem * hexGorizontalShift) * 2
-                tmp = RegularPolygon(radius = hexSize, start_angle = .5)
+                tmp = RegularPolygon(n=6, radius = hexSize, start_angle = .5)
+                # uncomment the following lines to get triangles of circles instead of hexagons
+                #tmp = RegularPolygon(n=3, radius = hexSize)
+                #tmp = Circle(radius = hexSize)
                 tmp.shift(UP * currentRowShiftUp)
                 tmp.shift(RIGHT * elemShiftRight)
                 hexagons.add(tmp)
@@ -156,7 +159,7 @@ class GaltonBoard(Scene):
         for k in range (itemsTotal):
             item = Item()
             circle = Circle(radius=circleRadius, color=GREEN, fill_opacity=1)
-            pathIndex = random.randrange(128)
+            pathIndex = self.createPathIndex()
             stackIndex = pathIndex.bit_count()
             stackValues[stackIndex] += 1
 
@@ -178,6 +181,21 @@ class GaltonBoard(Scene):
             #self.add(path)
 
         return items  
+
+    def createPathIndex(self):
+        pathIndex = random.randrange(128)
+        return pathIndex
+    
+        # the following code shows how to change probability 
+        # to 1/3 for left and 2/3 for right directions
+        pathIndex = 0
+        for x in range(0, 7):
+            tmp = random.randrange(3)
+            if (tmp == 0):
+                pathIndex += (2 ** x) * tmp
+            if (tmp > 0):
+                pathIndex += (2 ** x) * 1
+        return pathIndex
 
     def createPath(self, vertices, pathIndex, itemsCountInStack):
 
