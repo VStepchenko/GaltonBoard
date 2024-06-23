@@ -4,7 +4,7 @@ import random
 class GaltonBoard(Scene):
 
     config = {
-        "runTime": 16,#9
+        "runTime": 16,
         "itemsTotal" : 200,
         "itemDelayFrames" : 1,
         "hexSize" : .2,
@@ -63,6 +63,9 @@ class GaltonBoard(Scene):
         self.play(FadeIn(hexagons, run_time = 1))
         self.play(FadeIn(table, run_time = 1))
         self.play(FadeIn(counter, run_time = 1))
+
+        #group = VGroup(hexagons, table, counter)
+        #self.play(FadeIn(group, run_time = 1))
 
         # we need pass to the UpdateFromFunc the special object that should be updated every frame
         # without it where will (under some unpredictable conditions) be problems with animation
